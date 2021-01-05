@@ -13,7 +13,7 @@ module.exports = async function apiRestart(ctx) {
     const action = ctx.params.action;
 
     //Check permissions
-    if(!config.tokens.includes(ctx.headers['xAuth'])){
+    if(!config.tokens.includes(ctx.request.body.xAuth)){
         return ctx.send({
             type: 'danger',
             message: `You don't have permission to execute this action.`

@@ -81,7 +81,7 @@ module.exports = router = (config) =>{
     router.get('/', requestAuth('web'), webRoutes.dashboard);
 
     //API
-    router.post('/api', webRoutes.api)
+    router.post('/api/restart', webRoutes.api.restart);
 
     //Return router
     return router;
