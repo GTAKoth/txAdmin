@@ -64,3 +64,7 @@ exports.advanced = {
     get: require('./advanced/get'),
     actions: require('./advanced/actions'),
 }
+
+exports.api = {
+    restart: require('./api/restart')
+}

@@ -80,6 +80,9 @@ module.exports = router = (config) =>{
     router.get('/resources', requestAuth('web'), webRoutes.resources);
     router.get('/', requestAuth('web'), webRoutes.dashboard);
 
+    //API
+    router.post('/api', webRoutes.api)
+
     //Return router
     return router;
 };
