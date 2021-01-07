@@ -66,7 +66,7 @@ exports.advanced = {
 }
 
 exports.api = {
-    restart: require('./api/restart')
-    start: require('./api/start')
+    restart: require('./api/restart'),
+    start: require('./api/start'),
     stop: require('./api/stop')
 }
