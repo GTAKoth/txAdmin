@@ -1,12 +1,27 @@
 ## TODO v3.2
 - [x] update README
-- [x] merge PR#226
+- [x] added option to configure the scheduled restart warning times (merge PR#226)
 - [x] move the Monitor/Restarter tab in the settings page
 - [x] clean github Issues
 - [x] replace `clone` with `lodash/cloneDeep`
-- [ ] check the places where I'm doing `Object.assign()` for shallow clones
-- [ ] start collecting `/perf/` metrics
-- [ ] add performance chart to dashboard
+- [x] refactor dashboard in preparation to the chart
+- [x] remove many monitor settings since they were being misused and were never useful
+- [x] replace ping with player ID on sidebar
+- [x] updated packages
+- [x] start collecting `/perf/` metrics
+- [x] add performance chart to dashboard
+- [x] set darkmode as default
+- [x] compile test on latest, reset timer, version bump
+> v3.2.0
+- [x] fixed perf chart time labels
+> v3.2.1
+- [x] fixed perf chart URL
+> v3.2.2
+- [x] made the chart resposive
+- [x] made the chart player count more consistent
+- [x] reverted dark mode as default
+
+> ASAP!:
 - [ ] deal with the last 2 PRs
 - [ ] consolidate the log pages
 - [ ] add discord group whitelist (whitelist switch becomes a select box that will enable guildID and roleID)
@@ -21,21 +36,24 @@
 - [ ] add RedM compatibility
 - [ ] add `.editorconfig`
 - [ ] create auto backup of the database
+- [ ] ignore key bindings commands  https://discord.com/channels/577993482761928734/766868363041046589/795420910713831446
+- [ ] add custom event for broadcast
 
 
 > Hopefully now:
+- [ ] check the places where I'm doing `Object.assign()` for shallow clones
 - [ ] break `playerController` database stuff to another file
 - [ ] remove the ForceFXServerPort config and do either via `server.cfg` comment, or execute `endpoint_add_tcp "127.0.0.1:random"`
 - [ ] make `playerController.writePending` prioritized (low 5s, medium 30s, high 60s)
 - [ ] create `admin.useroptions` for dark mode, welcome modals and such
 
 > Soon™ (hopefully the next update)
+- [ ] remove hitch detector entirely
 - [ ] get all functions from `web\public\js\txadmin\players.js` and wrap in some object.
 - [ ] Add basic code linting
 - [ ] maybe hardcode if(recipeName == plume) to open the readme in a new tab
 - [ ] add new hardware bans
 - [ ] add stats enc?
-- [ ] the Commands card in the dashboard is underused since resource commands are useless and nobody knows the kick all and broadcast options are there
 - [ ] apply the new action log html to the modal
 - [ ] add `<fivem://connect/xxxxx>` to `/status` by getting `web_baseUrl` maybe from the heartbeat
 - [ ] add ban server-side ban cache (last 500 bans?), updated on every ban change 
@@ -51,6 +69,7 @@
 - [ ] break down `playerController` into separate files even more
 - [ ] rename `playerController` to `playerManager`?
 
+=======================================
 
 ## NUI commands
 While the menu is open, show `ID | PlayerName` above nearby player heads.
@@ -94,6 +113,8 @@ High-level roadmap:
 - Do all the txAdmin backend code to support those functions
 - Finish the interface (Look & Feel)
 
+=======================================
+
 ## Database Management page
 - erase all whitelists
 - erase all bans
@@ -106,7 +127,10 @@ High-level roadmap:
 Add a note that to erase the entire database, the user should delete the `playersDB.json` (full path) file and restart txAdmin.
 Pre calculate all counts
 
+=======================================
+
 ## Structured traces
+
 ### Rate limiter
 We could be more sensible when restarting the server and pushing an event to alert other resources thatm ight want to auto block it.
 ```bat
@@ -114,10 +138,14 @@ netsh advfirewall firewall add rule name="txAdmin_block_XXXX" dir=in interface=a
 netsh advfirewall firewall show rule name="txAdmin_block_XXXX"
 netsh advfirewall firewall delete rule name="txAdmin_block_XXXX"
 ```
+
 ### Oversized resources streams
 We could wait for the server to finish loading, as well as print in the interface somewhere an descending ordered list of large resource assets
 https://github.com/citizenfx/fivem/blob/649dac8e9c9702cc3e293f8b6a48105a9378b3f5/code/components/citizen-server-impl/src/ResourceStreamComponent.cpp#L435
 
+### Crash dumps
+
+=======================================
 
 ## Video tutorials
 Requirements:
@@ -167,6 +195,8 @@ Target: average txAdmin users
 - database pruning 
 - scheduled restarter
 
+=======================================
+
 ## Bot Commands:
 DONE:
 /addwl <wl req id>
@@ -182,10 +212,6 @@ TODO: Bot commands (in dev order):
 /info <mention> - shows someone else's info
 /addwl <mention>
 /removewl <mention>
-
-## "in the roadmap"
-- [ ] Check config management libraries (specially 'convict' by Mozilla and nconf)
-
 
 =======================================
 
@@ -234,12 +260,6 @@ https://www.npmjs.com/package/infinite-scroll
 ### "Look into it"
 https://www.reddit.com/r/javascript/comments/91a3tp/why_is_there_no_small_sane_nodejs_tool_for/
 
-Interesting shit, could be used to give like vMenu admin powers to txAdmin admins:
-https://github.com/citizenfx/fivem/commit/fd3fae946163e8af472b7f739aed6f29eae8105f
-
-Grafana query for the `/perf/` endpoint data: 
-`histogram_quantile(0.95, sum(rate(tickTime_bucket[5m])) by (le))`
-
 "State bag" support for C#
 https://github.com/citizenfx/fivem/pull/516
 https://github.com/citizenfx/fivem/pull/539
@@ -250,6 +270,8 @@ https://discordapp.com/channels/192358910387159041/450373719974477835/7013367235
 
 ### the ace permissions editor thing
 https://discordapp.com/channels/192358910387159041/450373719974477835/724266730024861717
+maybe playerConnecting and then set permission by ID?
+https://github.com/citizenfx/fivem/commit/fd3fae946163e8af472b7f739aed6f29eae8105f
 
 ### the fun command thing
 https://github.com/VenomXNL/XNLRideAnimals/blob/master/XNLRideAnimals/client.lua

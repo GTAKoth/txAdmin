@@ -19,15 +19,8 @@ const defaultConfig = {
     logger: {},
     monitor: {
         restarterSchedule: [],
-        healthCheck: {
-            failThreshold: 15,
-            failLimit: 300,
-        },
-        heartBeat: {
-            failThreshold: 15,
-            failLimit: 30,
-        }
     },
+    statsCollector: {},
     authenticator: {},
     webServer: {},
     discordBot: {
