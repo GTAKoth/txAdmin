@@ -2,7 +2,8 @@
 const fs = require('fs');
 const path = require('path');
 const slash = require('slash');
-const { dir, log, logOk, logWarn, logError } = require('./extras/console')();
+const { dir, log, logOk, logWarn, logError } = require('./extras/console')(`v${GlobalData.txAdminVersion}`);
+const { printBanner } = require('./extras/banner');
 
 //Helpers
 const cleanPath = (x) => { return slash(path.normalize(x)) };
@@ -14,6 +15,7 @@ globals = {
     discordBot: null,
     fxRunner: null,
     logger: null,
+    dynamicAds: null,
     monitor: null,
     statsCollector: null,
     translator: null,
@@ -41,6 +43,7 @@ globals = {
                 fd3Failed: 0,
             },
             bootSeconds: [],
+            freezeSeconds: [],
             pageViews: {},
             httpCounter: {
                 current: 0,
@@ -57,6 +60,7 @@ globals = {
                 discord: 0,
                 citizenfx: 0,
                 password: 0,
+                zap: 0,
             },
         },
     },
@@ -68,8 +72,8 @@ globals = {
  */
 module.exports = class txAdmin {
     constructor(serverProfile){
-        log(`>> Starting profile ${serverProfile}`);
-        globals.info.serverProfile =  serverProfile;
+        log(`Profile '${serverProfile}' starting...`);
+        globals.info.serverProfile = serverProfile;
 
         //Check if the profile exists and call setup if it doesn't
         const profilePath = cleanPath(path.join(GlobalData.dataPath, serverProfile));
@@ -108,6 +112,9 @@ module.exports = class txAdmin {
         this.startLogger(profileConfig.logger).catch((err) => {
             HandleFatalError(err, 'Logger');
         });
+        this.startDynamicAds().catch((err) => {
+            HandleFatalError(err, 'DynamicAds');
+        });
         this.startTranslator().catch((err) => {
             HandleFatalError(err, 'Translator');
         });
@@ -123,6 +130,9 @@ module.exports = class txAdmin {
         this.startPlayerController(profileConfig.playerController).catch((err) => {
             HandleFatalError(err, 'PlayerController');
         });
+
+        //Once they all finish loading, the function below will print the banner
+        printBanner();
 
         //NOTE: dependency order
         //  - translator before monitor
@@ -157,6 +167,12 @@ module.exports = class txAdmin {
     async startLogger(config){
         const Logger = require('./components/logger')
         globals.logger = new Logger(config);
+    }
+
+    //==============================================================
+    async startDynamicAds(config){
+        const DynamicAds = require('./components/dynamicAds')
+        globals.dynamicAds = new DynamicAds(config);
     }
 
     //==============================================================

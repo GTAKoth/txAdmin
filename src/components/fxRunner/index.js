@@ -21,19 +21,24 @@ const formatCommand = (cmd, ...params) => {
 
 module.exports = class FXRunner {
     constructor(config) {
-        logOk('Started');
+        // logOk('Started');
         this.config = config;
         this.spawnVariables = null;
         this.fxChild = null;
         this.restartDelayOverride == false;
         this.history = [];
         this.fxServerPort = null;
+        this.fxServerHost = null;
         this.outputHandler = new OutputHandler(this.config.logPath, 10);
 
         //The setTimeout is not strictly necessary, but it's nice to have other errors in the top before fxserver starts.
         if(config.autostart && this.config.serverDataPath !== null && this.config.cfgPath !== null){
             setTimeout(() => {
-                this.spawnServer(true);
+                if(globals.authenticator && globals.authenticator.admins){
+                    this.spawnServer(true);
+                }else{
+                    logWarn('The server will not auto start because there are no admins configured.');
+                }
             }, config.autostartDelay * 1000);
         }
     }
@@ -61,9 +66,12 @@ module.exports = class FXRunner {
 
         // Prepare default args
         const controllerConfigs = globals.playerController.config;
+        const txAdminInterface = (GlobalData.forceInterface)
+            ? `${GlobalData.forceInterface}:${GlobalData.txAdminPort}` 
+            : `127.0.0.1:${GlobalData.txAdminPort}`;
         const cmdArgs = [
             '+sets', 'txAdmin-version', GlobalData.txAdminVersion,
-            '+set', 'txAdmin-apiPort', GlobalData.txAdminPort,
+            '+set', 'txAdmin-apiHost', txAdminInterface,
             '+set', 'txAdmin-apiToken', globals.webServer.intercomToken,
             '+set', 'txAdmin-checkPlayerJoin', (controllerConfigs.onJoinCheckBan || controllerConfigs.onJoinCheckWhitelist).toString(),
             '+set', 'txAdminServerMode', 'true',
@@ -137,20 +145,27 @@ module.exports = class FXRunner {
             rawCfgFile = helpers.getCFGFileData(cfgFilePath);
         } catch (error) {
             const errMsg = logError(`server.cfg error: ${error.message}`);
-            logError(`Please go to the settigns page and fix the paths.`);
+            if(error.message.includes('unreadable')) {
+                logError(`You likely copied the txData folder from another server, or moved/deleted your server files.`);
+                logError(`Please go to "Settings > FXServer" and fix the "Server Data Folder" and "CFX File Path".`);
+            }
             return errMsg;
         }
         try {
             this.fxServerPort = helpers.getFXServerPort(rawCfgFile);
         } catch (error) {
-            const errMsg = logError(`server.cfg error: ${error.message}`);
+            const cleanedErrorMessage = error.message.replace(/\<\/?code>/gi, '').replace(/\<br>/gi, '');
+            const outMsg = logError(`server.cfg error: \n${cleanedErrorMessage}`);
             //the IF below is only a way to disable the endpoint check
             if(globals.config.forceFXServerPort){
                 this.fxServerPort = globals.config.forceFXServerPort;
             }else{
-                return errMsg;
+                return outMsg;
             }
         }
+        this.fxServerHost = (GlobalData.forceInterface)
+            ? `${GlobalData.forceInterface}:${this.fxServerPort}` 
+            : `127.0.0.1:${this.fxServerPort}`;
 
         //Reseting hitch counter
         globals.monitor.resetMonitorStats();

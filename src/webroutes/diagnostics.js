@@ -67,7 +67,7 @@ async function getProcessesData(){
             let procName;
             let order = process.timestamp || 1;
             if(pid == process.pid){
-                procName = 'FxMonitor + txAdmin';
+                procName = 'txAdmin (inside FXserver)';
                 order = 0;
             }else if(curr.memory <= 10*1024*1024){
                 procName = 'FXServer MiniDump';
@@ -113,9 +113,8 @@ async function getFXServerData(){
     }
 
     //Preparing request
-    const port = (globals.config.forceFXServerPort)? globals.config.forceFXServerPort : globals.fxRunner.fxServerPort;
     const requestOptions = {
-        url: `http://127.0.0.1:${port}/info.json`,
+        url: `http://${globals.fxRunner.fxServerHost}/info.json`,
         method: 'get',
         responseType: 'json',
         responseEncoding: 'utf8',
@@ -201,18 +200,17 @@ async function getHostData(){
         const userInfo = os.userInfo();
         const cpus = os.cpus();
 
-        let clockWarning;
-        if(cpus[0].speed <= 2400){
-            clockWarning = '<span class="badge badge-danger"> VERY SLOW! </span>';
-        }else if(cpus[0].speed < 3000){
-            clockWarning = `<span class="badge badge-warning"> SLOW </span>`;
-        }else{
-            clockWarning = ``;
+        let clockWarning = ``;
+        if(cpus.length < 8){
+            if(cpus[0].speed <= 2400){
+                clockWarning = '<span class="badge badge-danger"> VERY SLOW! </span>';
+            }else if(cpus[0].speed < 3000){
+                clockWarning = `<span class="badge badge-warning"> SLOW </span>`;
+            }
         }
 
         hostData.nodeVersion = process.version;
-        hostData.osType = `${os.type()} (${os.platform()}/${process.arch})`;
-        hostData.osRelease = `${os.release()}`;
+        hostData.osDistro = GlobalData.osDistro || GlobalData.osType;
         hostData.username = `${userInfo.username}`;
         hostData.clockWarning = clockWarning;
         hostData.cpus = `${cpus.length}x ${cpus[0].speed} MHz`;
@@ -258,7 +256,13 @@ async function gettxAdminData(){
         hbFD3Fails: globals.databus.txStatsData.heartBeatStats.fd3Failed,
         hbHTTPFails: globals.databus.txStatsData.heartBeatStats.httpFailed,
         hbBootSeconds: globals.databus.txStatsData.bootSeconds.join(', ') || '--',
+        freezeSeconds: globals.databus.txStatsData.freezeSeconds.join(', ') || '--',
         logFileSize,
+
+        //Possible memory leaks:
+        serverLogSize: globals.databus.serverLog.length || '--',
+        koaSessions: Object.keys(globals.webServer.koaSessionMemoryStore.sessions).length || '--',
+
         //Settings
         cooldown: globals.monitor.config.cooldown,
         schedule: globals.monitor.config.restarterSchedule.join(', ') || '--',

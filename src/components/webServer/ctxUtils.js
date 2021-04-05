@@ -55,7 +55,7 @@ sqrl.filters.define("base64", (x)=>{
     return Buffer.from(x).toString('base64');
 });
 sqrl.filters.define("ternary", (x)=>{
-    return (x[0])? x[2] : x[1];
+    return (x[0])? x[1] : x[2];
 });
 
 //================================================================
@@ -71,13 +71,14 @@ async function renderMasterView(view, reqSess, data, txVars){
     data.serverProfile = globals.info.serverProfile;
     data.txAdminVersion = GlobalData.txAdminVersion;
     data.txAdminOutdated = (now() > GlobalData.txAdminVersionBestBy);
-    data.fxServerVersion = GlobalData.fxServerVersion;
+    data.fxServerVersion = (GlobalData.isZapHosting)? `${GlobalData.fxServerVersion}/ZAP` : GlobalData.fxServerVersion;
     data.adminIsMaster = (reqSess && reqSess.auth && reqSess.auth.username && reqSess.auth.master === true);
     data.adminUsername = (reqSess && reqSess.auth && reqSess.auth.username)? reqSess.auth.username : 'unknown user';
     data.profilePicture = (reqSess && reqSess.auth && reqSess.auth.picture)? reqSess.auth.picture : 'img/default_avatar.png';
     data.isTempPassword = (reqSess && reqSess.auth && reqSess.auth.isTempPassword);
     data.isLinux = (GlobalData.osType == 'linux');
     data.showAdvanced = (GlobalData.isAdvancedUser || GlobalData.verbose);
+    data.dynamicAd = globals.dynamicAds.pick('main');
 
     let out;
     try {
@@ -111,6 +112,7 @@ async function renderMasterView(view, reqSess, data, txVars){
 async function renderLoginView(data, txVars){
     if(isUndefined(data)) data = {};
     data.uiTheme = (txVars.darkMode)? 'theme--dark' : '';
+    data.logoURL = (GlobalData.loginPageLogo)? GlobalData.loginPageLogo : 'img/txadmin.png';
     data.isMatrix = (Math.random() <= 0.05);
     data.ascii = helpers.txAdminASCII();
     data.message = data.message || '';
@@ -119,8 +121,9 @@ async function renderLoginView(data, txVars){
     data.template = data.template || 'normal';
     data.serverProfile = globals.info.serverProfile;
     data.txAdminVersion = GlobalData.txAdminVersion;
-    data.fxServerVersion = GlobalData.fxServerVersion;
+    data.fxServerVersion = (GlobalData.isZapHosting)? `${GlobalData.fxServerVersion}/ZAP` : GlobalData.fxServerVersion;
     data.serverName = globals.config.serverName || globals.info.serverProfile;
+    data.dynamicAd = globals.dynamicAds.pick('login');
 
     let out;
     try {

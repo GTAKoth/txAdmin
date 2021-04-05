@@ -95,6 +95,14 @@
                         <div class="card-header">Step 1: Review Recipe ✔️</div>
                         <div class="card-header font-weight-bold ">Step 2: Input Parameters</div>
                         <div class="card-body">
+                            {{@if(it.defaults.autofilled)}}
+                                <div class="row mb-3 mt-0 text-center">
+                                    <div class="col-8 mx-auto card d-block border-warning p-2 mb-1">
+                                        <strong>Note:</strong> The following config was autofilled by <strong>Zap-Hosting</strong>. <br>
+                                        You <i>may</i> edit those, but it's strongly disencouraged.
+                                    </div>
+                                </div>
+                            {{/if}}
                             <form id="step2-form">
                                 <div class="form-group row">
                                     <label for="step2-svLicense" class="col-sm-3 col-form-label">
@@ -103,7 +111,8 @@
                                     </label>
                                     <div class="col-sm-9">
                                         <input type="text" class="form-control blur-input" id="step2-svLicense" maxlength="32" 
-                                            autocomplete="off" placeholder="YourKeyYourKeyYourKeyYourKeyYour" required autofocus>
+                                            autocomplete="off" placeholder="YourKeyYourKeyYourKeyYourKeyYour" 
+                                            value="{{it.defaults.license}}" required autofocus>
                                         <span class="form-text text-muted">
                                             The license key for your server obtained in <a href="https://keymaster.fivem.net/" target="_blank" rel="noopener noreferrer">Keymaster</a>.
                                         </span>
@@ -117,7 +126,7 @@
                                         </label>
                                         <div class="col-sm-9">
                                             <input type="text" class="form-control" id="step2-dbHost"
-                                                placeholder="localhost" value="localhost" required>
+                                                placeholder="{{it.defaults.mysqlHost}}" value="{{it.defaults.mysqlHost}}" required>
                                             <span class="form-text text-muted">
                                                 The IP/Hostname of the database server (usually <code>localhost</code>).
                                             </span>
@@ -130,7 +139,7 @@
                                         </label>
                                         <div class="col-sm-9">
                                             <input type="text" class="form-control" id="step2-dbUsername"
-                                                placeholder="root" value="root" required>
+                                                placeholder="{{it.defaults.mysqlUser}}" value="{{it.defaults.mysqlUser}}" required>
                                             <span class="form-text text-muted">
                                                 The database username (usually <code>root</code>).
                                             </span>
@@ -142,9 +151,9 @@
                                         </label>
                                         <div class="col-sm-9">
                                             <input type="text" class="form-control blur-input" id="step2-dbPassword"
-                                                autocomplete="off" placeholder="empty" value="">
+                                                autocomplete="off" placeholder="leave it blank" value="{{it.defaults.mysqlPassword}}">
                                             <span class="form-text text-muted">
-                                                The database password (usually empty).
+                                                The database password (usually blank).
                                             </span>
                                         </div>
                                     </div>
@@ -154,9 +163,9 @@
                                         </label>
                                         <div class="col-sm-9">
                                             <input type="text" class="form-control" id="step2-dbName"
-                                                placeholder="{{it.deploymentID}}" value="{{it.deploymentID}}">
+                                                placeholder="{{it.defaults.mysqlDatabase}}" value="{{it.defaults.mysqlDatabase}}">
                                             <span class="form-text text-muted">
-                                                The name of the database to be used. <br>
+                                                The name of the database to be used or created. <br>
                                                 If left empty, the deployment ID (<code>{{it.deploymentID}}</code>) will be used instead.
                                             </span>
                                         </div>
@@ -309,6 +318,8 @@
     <script>
         //============================================== CodeMirror & Page Setup
         const currentStep = '{{it.step}}';
+        const isPlaceholderRecipe = ('{{it.isPlaceholderRecipe}}' === 'true');
+        const codeMirrorTarget = document.getElementById("codeMirrorTarget");
         const timeoutLong = 4000;
 
         const checkDoLogoutRefresh = (data) => {
@@ -334,7 +345,6 @@
                 },
             });
             if(currentStep == 'review' || currentStep == 'configure'){
-                const codeMirrorTarget = document.getElementById("codeMirrorTarget");
                 window.CMInstance = CodeMirror.fromTextArea(codeMirrorTarget, {
                     mode: (currentStep == 'review')? 'yaml' : 'fivem-cfg',
                     lineNumbers: true,
@@ -349,6 +359,9 @@
         //============================================== Step1 action
         function step1Action(){
             const editor = window.CMInstance;
+            if(isPlaceholderRecipe && codeMirrorTarget.value == editor.getValue()){
+                return $.notify({ message: `If you are not trying to write a recipe, click on the cancel button below to return to the setup page, where you can select a recommended template.` }, { type: 'warning' });
+            }
             editor.setValue(editor.getValue().replace(/\t/g, ' '.repeat(4)));
             const recipe = editor.getValue();
             if(recipe.length < 128){

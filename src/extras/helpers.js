@@ -112,7 +112,7 @@ function getCFGFileData(cfgPath) {
     try {
         return fs.readFileSync(cfgPath).toString();
     } catch (error) {
-        throw new Error("Cannot read CFG Path file.");
+        throw new Error("Cannot read CFG file.");
     }
 }
 
@@ -137,52 +137,111 @@ function resolveCFGFilePath(cfgPath, serverDataPath) {
  *  - port mismatch
  *  - "stop monitor"
  *  - if endpoint on 40120~40130
+ *  - zap-hosting iface and port enforcement
  * @param {string} rawCfgFile
  */
 function getFXServerPort(rawCfgFile) {
     if(rawCfgFile.includes('stop monitor')) throw new Error(`Remove "stop monitor" from your config`);
 
-    const regex = /^\s*endpoint_add_(\w+)\s+["']?([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})\:([0-9]{1,5})["']?.*$/gim;
-    // const regex = /endpoint_add_(\w+)\s+["']?([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})\:([0-9]{1,5})["']?.*/gi;
-    let matches = [];
+    const maxClientsRegex = /^\s*sv_maxclients\s+(\d+).*$/gim;
+    const endpointsRegex = /^\s*endpoint_add_(\w+)\s+["']?([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})\:([0-9]{1,5})["']?.*$/gim;
+    // const endpointsRegex = /endpoint_add_(\w+)\s+["']?([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})\:([0-9]{1,5})["']?.*/gi;
+    let endpoints = [];
+    let maxClients = [];
     try {
         let match;
-        while (match = regex.exec(rawCfgFile)) {
-            matches.push({
+        while (match = endpointsRegex.exec(rawCfgFile)) {
+            endpoints.push({
                 line: match[0].trim(),
-                type: match[1],
-                interface: match[2],
-                port: match[3],
+                type: match[1].toLowerCase(),
+                iface: match[2],
+                port: parseInt(match[3]),
             });
+        }
+        while (match = maxClientsRegex.exec(rawCfgFile)) {
+            maxClients.push(parseInt(match[1]));
         }
     } catch (error) {
         throw new Error("Regex Match Error");
     }
-
-    if(!matches.length) throw new Error("No <code>endpoint_add_*</code> found inside the file");
-
-    const validTCPEndpoint = matches.find((match) => {
-        return (match.type.toLowerCase() === 'tcp' && (match.interface === '0.0.0.0' || match.interface === '127.0.0.1'))
-    })
-    if(!validTCPEndpoint) throw new Error("You MUST have one <code>endpoint_add_tcp</code> with IP 0.0.0.0 in your config");
-
-    const validUDPEndpoint = matches.find((match) => {
-        return (match.type.toLowerCase() === 'udp')
-    })
-    if(!validUDPEndpoint) throw new Error("You MUST have at least one <code>endpoint_add_udp</code> in your config");
-
-    //FIXME: Think of something to make this work:
-    //  https://forum.fivem.net/t/release-txadmin-manager-discord-bot-live-console-playerlist-autorestarter/530475/348?u=tabarra
-    matches.forEach((m) => {
-        if(m.port !== matches[0].port) throw new Error("All <code>endpoint_add_*</code> MUST have the same port")
-    });
-
-    const port = parseInt(matches[0].port);
-    if(port >= 40120 && port <= 40130){
-        throw new Error(`The port ${port} is dedicated for txAdmin and can not be used for FXServer, please edit your <code>endpoint_add_*</code>`);
+    
+    //Checking for the maxClients 
+    if(GlobalData.deployerDefaults && GlobalData.deployerDefaults.maxClients){
+        if(!maxClients.length){
+            throw new Error(`Zap-Hosting: please add 'sv_maxclients ${GlobalData.deployerDefaults.maxClients}' to your server.cfg.`);
+        }
+        if(maxClients.some(mc => mc > GlobalData.deployerDefaults.maxClients)){
+            throw new Error(`Zap-Hosting: your 'sv_maxclients' MUST be less or equal than ${GlobalData.deployerDefaults.maxClients}.`);
+        }
     }
 
-    return port;
+    //Checking if endpoints present at all
+    const oneTCPEndpoint = endpoints.find((m) => (m.type === 'tcp'));
+    if(!oneTCPEndpoint) throw new Error("You MUST have at least one <code>endpoint_add_tcp</code> in your config");
+    const oneUDPEndpoint = endpoints.find((m) => (m.type === 'udp'));
+    if(!oneUDPEndpoint) throw new Error("You MUST have at least one <code>endpoint_add_udp</code> in your config");
+
+    //FIXME: Think of something to make this work:
+    const firstPort = endpoints[0].port;
+    endpoints.forEach((m) => {
+        if(m.port !== firstPort) throw new Error("All <code>endpoint_add_*</code> MUST have the same port");
+    });
+
+    if(firstPort >= 40120 && firstPort <= 40130){
+        throw new Error(`The port ${firstPort} is dedicated for txAdmin and can not be used for FXServer, please edit your <code>endpoint_add_*</code>`);
+    }
+
+    //IF Zap-hosting interface bind enforcement
+    if(GlobalData.forceInterface){
+        const stdMessage = [
+            `Remove all lines containing <code>endpoint_add</code> and add the lines below to the top of your file.`,
+            `<code>endpoint_add_tcp "${GlobalData.forceInterface}:${GlobalData.forceFXServerPort}"`,
+            `endpoint_add_udp "${GlobalData.forceInterface}:${GlobalData.forceFXServerPort}"</code>`,
+        ].join('\n<br>');
+
+        //Check if all ports are the ones being forced
+        if(firstPort !== GlobalData.forceFXServerPort){
+            throw new Error(`Zap-Hosting: invalid port found.<br>\n ${stdMessage}`);
+        }
+
+        //Check if all interfaces are the ones being forced
+        const invalidInterface = endpoints.find((match) => match.iface !== GlobalData.forceInterface);
+        if(invalidInterface) throw new Error(`Zap-Hosting: invalid interface '${invalidInterface.iface}'.<br>\n${stdMessage}`);
+
+    }else{
+        const validTCPEndpoint = endpoints.find((match) => {
+            return (match.type === 'tcp' && (match.iface === '0.0.0.0' || match.iface === '127.0.0.1'))
+        })
+        if(!validTCPEndpoint) throw new Error("You MUST have one <code>endpoint_add_tcp</code> with IP 0.0.0.0 in your config");
+    }
+
+    return firstPort;
+}
+
+
+//================================================================
+/**
+ * Returns the first likely server.cfg given a server data path, or false
+ * @param {string} serverDataPath
+ */
+function findLikelyCFGPath(serverDataPath) {
+    const attempts = [
+        'server.cfg',
+        'server.cfg.txt',
+        'server.cfg.cfg',
+        'server.txt',
+        'server',
+        '../server.cfg',
+    ]
+
+    for (let i = 0; i < attempts.length; i++) {
+        const cfgPath = path.join(serverDataPath, attempts[i]);
+        try {
+            getCFGFileData(cfgPath);
+            return cfgPath;
+        } catch (error) {}
+    }
+    return false;
 }
 
 
@@ -194,4 +253,5 @@ module.exports = {
     getCFGFileData,
     resolveCFGFilePath,
     getFXServerPort,
+    findLikelyCFGPath,
 }

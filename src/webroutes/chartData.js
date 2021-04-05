@@ -1,7 +1,5 @@
 //Requires
 const modulename = 'WebServer:ChartData';
-const dateFormat = require('dateformat');
-const xss = require('../extras/xss')();
 const { dir, log, logOk, logWarn, logError, getLog } = require('../extras/console')(modulename);
 
 
@@ -16,17 +14,18 @@ module.exports = async function chartData(ctx) {
     if(globals.statsCollector.perfSeries.length < 12){
         return ctx.send({failReason: 'not_enough_data'});
     }
-    
+
     //Process data & filter thread
-    // const threadName = 'svNetwork';
-    // const threadName = 'svSync';
-    const threadName = 'svMain';
-    const maxDeltaTime = 288; //5*288 = 1440 = 1 day
+    const availableThreads = ['svNetwork', 'svSync', 'svMain'];
+    const threadName = (availableThreads.includes(ctx.query.thread))? ctx.query.thread : 'svMain';
+    // const maxDeltaTime = 288; //5*288 = 1440 = 1 day
+    const maxDeltaTime = 360; //5*360 = 30 hours
     let outData;
     try {
         outData = globals.statsCollector.perfSeries.slice(-maxDeltaTime).map(s => {
             return {
                 ts: s.ts,
+                skipped: s.skipped,
                 clients: s.clients,
                 avgTime: s.perf[threadName].sum / s.perf[threadName].count,
                 buckets: s.perf[threadName].buckets,

@@ -1,28 +1,40 @@
-## TODO v3.2
-- [x] update README
-- [x] added option to configure the scheduled restart warning times (merge PR#226)
-- [x] move the Monitor/Restarter tab in the settings page
-- [x] clean github Issues
-- [x] replace `clone` with `lodash/cloneDeep`
-- [x] refactor dashboard in preparation to the chart
-- [x] remove many monitor settings since they were being misused and were never useful
-- [x] replace ping with player ID on sidebar
+## TODO v3.5.0
+- [x] fix whitelist sorting order in the players page
 - [x] updated packages
-- [x] start collecting `/perf/` metrics
-- [x] add performance chart to dashboard
-- [x] set darkmode as default
-- [x] compile test on latest, reset timer, version bump
-> v3.2.0
-- [x] fixed perf chart time labels
-> v3.2.1
-- [x] fixed perf chart URL
-> v3.2.2
-- [x] made the chart resposive
-- [x] made the chart player count more consistent
-- [x] reverted dark mode as default
+- [x] convert the logger to lua and use fd3 (thanks @AvarianKnight)
+- [x] increased chart performance by 60%
+- [x] settings/save/monitor: fixed schedules restart times validation
+- [x] cfg editor: save on ctrl+s
+- [x] zap: Disable "Slow" label when vCore count >= 8;
+- [x] zap: On txAdmin boot, read then erase `txData/txAdminZapConfig.json`;
+- [x] zap: Login page logo url from the config file (the 5% chance matrix easter egg won't be affected);
+- [x] zap: Preset txAdmin interface/port;
+- [x] zap: Enforce server.cfg endpoints;
+- [x] zap: Make server deployer preset `server.cfg` endpoints. (unplanned)
+- [x] zap: Database and license autofill in the deployer - the user can change it if they want;
+- [x] zap: Master account automatically set on startup or first start;
+- [x] zap: Add txData path warnings;
+- [x] zap: Add `sv_maxClients` enforcement;
+- [x] zap: One-click-login button via JWT/JWT (and documment it); 
+- [x] zap: increase `txAdminVersionBestBy` by 10d when running in zap;
+- [x] zap: Ad placement on login page, main interface (desk/mobile), and home-hosting warning (CLI);
+- [x] make chart available without auth (since its public info anyways) and add thread filter
+> v3.5.0
+- [x] fix discord bot for guilds with stage channels
+- [x] on windows, always open the web page on boot
+- [x] allow 3 chars admin names
+- [x] disable server auto-start when no admins configured
+- [x] login page indicate if the `admins.json` file is not found
+
+
+Quickie:
+- crash replace 45 > 90?
+- ctx.ip overwrite with xff?
+- make warns revokable?
 
 > ASAP!:
-- [ ] deal with the last 2 PRs
+- [ ] a way to create admins file without cfx.re 
+- [ ] rename authenticator pra adminVault
 - [ ] consolidate the log pages
 - [ ] add discord group whitelist (whitelist switch becomes a select box that will enable guildID and roleID)
         - Manual Approval (default)
@@ -32,8 +44,6 @@
         - this will trigger a big status message to be sent in that channel
         - this message id can be stored in the config file
         - if discord id is present, use that instead of name (careful with the pings!)
-- [ ] send log via FD3
-- [ ] add RedM compatibility
 - [ ] add `.editorconfig`
 - [ ] create auto backup of the database
 - [ ] ignore key bindings commands  https://discord.com/channels/577993482761928734/766868363041046589/795420910713831446
@@ -154,7 +164,7 @@ Requirements:
 ### [OFFICIAL] How to make a FiveM Server tutorial 2021 for beginners!
 Target: absolute beginners, barely have a vps
 - Requirements:
-    - Needs to be a VPS
+    - Needs to be a VPS (show suggestion list)
     - OS: windows server 2016 or 2019 recommended
     - Hardware specs recommendation
     - Download Visual C++
@@ -164,7 +174,7 @@ Target: absolute beginners, barely have a vps
 - Open firewall ports (show windows + OVH)
 - Download artifact (show difference between latest and latest recommended)
 - Set folder structure
-- Run txAdmin
+- Run txAdmin (should open chrome, if it doesn't, then open manually)
 - Open page outside VPS to show the ip:port thing
 - Create master account
 - Setup:
@@ -180,7 +190,7 @@ Target: server owners that followed the stupid Jeva tutorial
 - Show current stupid folder structure
 - Download artifact (show difference between latest and latest recommended)
 - Set new folder structure
-- Run txAdmin
+- Run txAdmin (should open chrome, if it doesn't, then open manually)
 - Create master account
 - Setup (show endpoint + server.cfg.txt errors)
 - Show how to create admins
@@ -219,17 +229,43 @@ TODO: Bot commands (in dev order):
 ```bash
 # run
 cd /e/FiveM/builds/3247/citizen/system_resources/monitor
-nodemon +set txAdminFakePlayerlist yesplzx +set txAdminVerbose truex
+nodemon +set txDebugPlayerlistGenerator truex +set txAdminVerbose truex
+nodemon +set txDebugPlayerlistGenerator true +set txAdminRTS "deadbeef00deadbeef00deadbeef00deadbeef00deadbeef" +set txAdminVerbose truex
+nodemon +set txDebugPlayerlistGenerator true +set txDebugExternalSource "x.x.x.x:30120" +set txAdminVerbose truex
 
 # build
-rm -rf dist
-npm run build
+rm -rf dist && npm run build && tar.exe -cvf dist/monitor.zip dist/* && explorer dist
 
-# upgrade util:
+# other stuff
+export TXADMIN_DEFAULT_LICENSE="YourKeyYourKeyYourKeyYourKeyYour"
 npm-upgrade
-
-# F8
 con_miniconChannels script:monitor*
+```
+
+```json
+{
+    "interface": "192.168.0.123",
+    "fxServerPort": 30120,
+    "txAdminPort": 40120,
+    "loginPageLogo": "https://github.com/tabarra/txAdmin/raw/master/docs/banner.png",
+    "defaults": {
+        "license": "YourKeyYourKeyYourKeyYourKeyYour",
+        "maxClients": 10,
+        "mysqlHost": "mysql-mariadb-20-104.zap-hosting.com",
+        "mysqlUser": "xxxxxxxxxx",
+        "mysqlPassword": "xxxxxxxxxx",
+        "mysqlDatabase": "xxxxxxxxxx"
+    },
+    "customer": {
+        "name": "tabarra",
+        "password_hash": "$2y$12$WNuN6IxozL4CjgScsLvmGOmxtskg8EcPe67HtUw0ENeCCSaZ.z3AW"
+    },
+
+    "interface-": false,
+    "loginPageLogo-": false,
+    "customer-": false
+}
+
 ```
 
 =======================================

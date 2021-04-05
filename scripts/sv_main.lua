@@ -1,9 +1,9 @@
 --Helpers
 function log(x)
-    print("^5[txAdminClientLUA]^0 " .. x)
+    print("^5[txAdminClient]^0 " .. x)
 end
 function logError(x)
-    print("^5[txAdminClientLUA]^1 " .. x .. "^0")
+    print("^5[txAdminClient]^1 " .. x .. "^0")
 end
 function unDeQuote(x)
     local new, count = string.gsub(x, utf8.char(65282), '"')
@@ -11,14 +11,14 @@ function unDeQuote(x)
 end
 
 --Check Environment
-local apiPort = GetConvar("txAdmin-apiPort", "invalid")
+local apiHost = GetConvar("txAdmin-apiHost", "invalid")
 local apiToken = GetConvar("txAdmin-apiToken", "invalid")
 local txAdminClientVersion = GetResourceMetadata(GetCurrentResourceName(), 'version')
 if GetConvar('txAdminServerMode', 'false') ~= 'true' then
     return
 end
-if apiPort == "invalid" or apiToken == "invalid" then
-    logError('API Port and Token ConVars not found. Do not start this resource if not using txAdmin.')
+if apiHost == "invalid" or apiToken == "invalid" then
+    logError('API Host or Token ConVars not found. Do not start this resource if not using txAdmin.')
     return
 end
 
@@ -56,32 +56,24 @@ end)
 
 -- HeartBeat functions
 function HTTPHeartBeat()
-    local playerCount = GetNumPlayerIndices()
-    
-    local players = {}
-    for i = 0, playerCount - 1 do
-        local player = GetPlayerFromIndex(i)
-		if player ~= nil then
-			local numIds = GetNumPlayerIdentifiers(player)
-
-			local ids = {}
-			for j = 0, numIds - 1 do
-				table.insert(ids, GetPlayerIdentifier(player, j))
-			end
-			local playerData = {
-				id = player,
-				identifiers = ids,
-				name = GetPlayerName(player),
-				ping = GetPlayerPing(player)
-			}
-			table.insert(players, playerData)
-		end
+    local curPlyData = {}
+    local players = GetPlayers()
+    for i = 1, #players do
+        local player = players[i]
+        local ids = GetPlayerIdentifiers(player)
+        -- using manual insertion instead of table.insert is faster
+        curPlyData[i] = {
+            id = player,
+            identifiers = ids,
+            name = GetPlayerName(player),
+            ping = GetPlayerPing(player)
+        }
     end
 
-    local url = "http://127.0.0.1:"..apiPort.."/intercom/monitor"
+    local url = "http://"..apiHost.."/intercom/monitor"
     local exData = {
         txAdminToken = apiToken,
-        players = players
+        players = curPlyData
     }
     PerformHttpRequest(url, function(httpCode, data, resultHeaders)
         local resp = tostring(data)
@@ -283,7 +275,7 @@ function txaReportResources(source, args)
     end
 
     --Send to txAdmin
-    local url = "http://127.0.0.1:"..apiPort.."/intercom/resources"
+    local url = "http://"..apiHost.."/intercom/resources"
     local exData = {
         txAdminToken = apiToken,
         resources = resources
@@ -301,7 +293,7 @@ end
 function handleConnections(name, skr, d)
     if  GetConvar("txAdmin-checkPlayerJoin", "invalid") == "true" then
         d.defer()
-        local url = "http://127.0.0.1:"..apiPort.."/intercom/checkPlayerJoin"
+        local url = "http://"..apiHost.."/intercom/checkPlayerJoin"
         local exData = {
             txAdminToken = apiToken,
             identifiers  = GetPlayerIdentifiers(source),

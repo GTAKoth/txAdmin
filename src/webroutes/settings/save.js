@@ -101,6 +101,7 @@ function handleGlobal(ctx) {
 //================================================================
 /**
  * Handle FXServer settings
+ * TODO: it MAY be worth to use helpers.findLikelyServerDataPath() and helpers.findLikelyCFGPath()
  * @param {object} ctx
  */
 function handleFXServer(ctx) {
@@ -271,7 +272,7 @@ function handleMonitor(ctx) {
         }
     });
     if(invalidRestartTimes.length){
-        const message = `<strong>The following entries were not recognized as valid 24h times:</strong><br>`;
+        let message = `<strong>The following entries were not recognized as valid 24h times:</strong><br>`;
         message += invalidRestartTimes.join('<br>\n');
         return ctx.send({type: 'danger', message: message});
     }
@@ -294,7 +295,7 @@ function handleMonitor(ctx) {
         }
     });
     if(invalidRestartWarningMinutes.length){
-        const message = `<strong>The following entries were not recognized as valid minutes before restart warning:</strong><br>`;
+        let message = `<strong>The following entries were not recognized as valid minutes before restart warning:</strong><br>`;
         message += invalidRestartWarningMinutes.join('<br>\n');
         return ctx.send({type: 'danger', message: message});
     }

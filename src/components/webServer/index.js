@@ -16,8 +16,6 @@ const { customAlphabet } = require('nanoid');
 const dict51 = require('nanoid-dictionary/nolookalikes');
 const nanoid = customAlphabet(dict51, 20);
 
-const boxen = require('boxen');
-const chalk = require('chalk');
 const { setHttpCallback } = require('@citizenfx/http-wrapper');
 const { dir, log, logOk, logWarn, logError } = require('../../extras/console')(modulename);
 const {requestAuth} = require('./requestAuthenticator');
@@ -30,6 +28,7 @@ module.exports = class WebServer {
         this.intercomToken = nanoid();
         this.koaSessionKey = `txAdmin:${globals.info.serverProfile}:sess`;
         this.webConsole = null;
+        this.isListening = false;
 
         this.setupKoa();
         this.setupWebsocket();
@@ -190,6 +189,9 @@ module.exports = class WebServer {
 
     //================================================================
     setupServerCallbacks(){
+        //Just in case i want to re-execute this function
+        this.isListening = false;
+
         //Print cfx.re url... when available
         //NOTE: perhaps open the URL automatically with the `open` library
         const validUrlRegex = /^[0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}\.users\.cfx\.re$/i
@@ -197,7 +199,8 @@ module.exports = class WebServer {
             try {
                 const urlConvar = GetConvar('web_baseUrl', 'false');
                 if(validUrlRegex.test(urlConvar)){
-                    logOk(`Alternative URL: ` + chalk.inverse(` https://${urlConvar}/ `));
+                    // logOk(`Alternative URL: ` + chalk.inverse(` https://${urlConvar}/ `));
+                    logOk(`Cfx.re URL: https://${urlConvar}/`);
                     GlobalData.cfxUrl = urlConvar;
                     clearInterval(getUrlInterval);
                 }
@@ -214,40 +217,30 @@ module.exports = class WebServer {
 
         //HTTP Server
         try {
-            this.httpServer = HttpClass.createServer(this.httpCallbackHandler.bind(this, 'httpserver'));
-            this.httpServer.on('error', (error)=>{
+            const listenErrorHandler = (error)=>{
                 if(error.code !== 'EADDRINUSE') return;
                 logError(`Failed to start HTTP server, port ${error.port} already in use.`);
                 logError(`Maybe you already have another txAdmin running in this port.`);
                 logError(`If you want to run multiple txAdmin, check the documentation for the port convar.`);
                 process.exit();
+            }
+            this.httpServer = HttpClass.createServer(this.httpCallbackHandler.bind(this, 'httpserver'));
+            this.httpServer.on('error', listenErrorHandler);
+
+            let iface;
+            if(GlobalData.forceInterface){
+                logWarn(`Starting with interface ${GlobalData.forceInterface}.`);
+                logWarn(`If the HTTP server doesn't start, this is probably the reason.`);
+                iface = GlobalData.forceInterface;
+            }else{
+                iface = '0.0.0.0';
+            }
+
+            this.httpServer.listen(GlobalData.txAdminPort, iface, async () => {
+                logOk(`Listening on ${iface}.`);
+                this.isListening = true;
             });
-            this.httpServer.listen(GlobalData.txAdminPort, '0.0.0.0', async () => {
-                const boxOptions = {
-                    padding: 1,
-                    margin: 1,
-                    align: 'center',
-                    borderStyle: 'bold',
-                    borderColor: 'cyan',
-                    // backgroundColor: 'cyan',
-                }
-                const addr = (GlobalData.osType === 'linux')? 'your-public-ip' : 'localhost';
-                const boxText = `Please access:\n` + chalk.inverse(` http://${addr}:${GlobalData.txAdminPort}/ `);
-                const logPrefix = chalk.bold.bgGreen(`[txAdmin:WebServer]`);
-                const banner = boxen(boxText, boxOptions).replace(/\n/g, `\n${logPrefix} `)
-                logOk(banner);
-                // logOk(`Please access ` + chalk.inverse(` http://${addr}:${GlobalData.txAdminPort}/ `));
-                if(
-                    globals.authenticator &&
-                    globals.authenticator.admins === false &&
-                    GlobalData.osType === 'windows'
-                ){
-                    const open = require('open');
-                    try {
-                        await open(`http://${addr}:${GlobalData.txAdminPort}/auth#${globals.authenticator.addMasterPin}`);
-                    } catch (error) {}
-                }
-            });
+
         } catch (error) {
             logError('Failed to start HTTP server with error:');
             dir(error);

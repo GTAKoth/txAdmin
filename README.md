@@ -9,7 +9,12 @@
 		Join our Discord Server: &nbsp; <a href="https://discord.gg/AFAAXzq"><img src="https://discordapp.com/api/guilds/577993482761928734/widget.png?style=shield"></img></a>
 	</h4>
 	<p align="center">
-		<b>txAdmin</b> is a <b>full featured</b> web panel to Manage & Monitor your FiveM Server remotely, in use by over three thousand servers worldwide at any given time.
+		<b>txAdmin</b> is a <b>full featured</b> web panel to Manage & Monitor your FiveM/RedM Server remotely, in use by over <strong>FIVE</strong> thousand servers worldwide at any given time.
+	</p>
+	<p align="center">
+		<a href="https://zap-hosting.com/txadmin4" target="_blank" rel="noopener">
+			<img src="docs/zaphosting.png" alt="zap-hosting"></img>
+		</a>
 	</p>
 </p>
 
@@ -19,6 +24,7 @@
 ## Main Features
 - Recipe-based Server Deployer: create a server in under 60 seconds! ([more info](docs/recipe.md))
 - Start/Stop/Restart your server instance or resources
+- Server Performance Chart
 - Access control:
 	- Login via Password or CitizenFX
 	- Admin permission system ([more info](docs/permissions.md))
@@ -64,6 +70,7 @@ txAdmin requires to be launched from *inside* FXServer in monitor mode, to do th
 ### ConVars
 - **serverProfile:** The name of the server profile to start. Profiles are saved/loaded from the current directory inside the `txData` folder. The default is `default`.
 - **txAdminPort:** The TCP port to use as HTTP Server. The default is `40120`.
+- **txAdminInterface:** The interface to use as HTTP Server. The default is `0.0.0.0`.
 - **txDataPath:** The path of the data folder. The default on Windows is `<citizen_root>/../txData` and on Linux `<citizen_root>/../../../txData`.
 - **txAdminVerbose:** Set to `true` to print on the console more detailed information about errors and events. The default is `false`.
   

@@ -37,7 +37,7 @@ const getBuild = (ver)=>{
 const txAdmin1337Convar = GetConvar('txAdmin1337', 'false').trim();
 if(process.env.APP_ENV !== 'webpack' && txAdmin1337Convar !== 'IKnowWhatImDoing'){
     logError(`Looks like you don't know what you are doing.`);
-    logDie(`Please use the compiled release from GitHub or the version that comes with the latest FXServer.`)
+    logDie(`Please use the compiled release from GitHub or the version that comes with the latest FXServer.`);
 }
 const isAdvancedUser = (process.env.APP_ENV !== 'webpack' && txAdmin1337Convar == 'IKnowWhatImDoing');
 
@@ -45,9 +45,9 @@ const isAdvancedUser = (process.env.APP_ENV !== 'webpack' && txAdmin1337Convar =
 const osTypeVar = os.type();
 let osType;
 if(osTypeVar == 'Windows_NT'){
-    osType = 'windows'
+    osType = 'windows';
 }else if(osTypeVar == 'Linux'){
-    osType = 'linux'
+    osType = 'linux';
 }else{
     logDie(`OS type not supported: ${osTypeVar}`)
 }
@@ -68,16 +68,6 @@ if(fxServerVersion < 2524){
 const txAdminVersion = GetResourceMetadata(resourceName, 'version');
 if(typeof txAdminVersion !== 'string' || txAdminVersion == 'null'){
     logDie(`txAdmin version not set or in the wrong format`);
-}
-
-//Check if this version of txAdmin is too outdated to be considered safe to use in prod
-//NOTE: Only valid if its being very actively maintained.
-//          Use 30d for patch 0, or 45~60d otherwise
-const txAdminVersionBestBy = 1610430000 + (27 * 86400); 
-// dir(new Date(txAdminVersionBestBy*1000).toLocaleString()) // 08/02/2021 03:40:00 BRT 
-if(now() > txAdminVersionBestBy){
-    logError(`This version of txAdmin is outdated.`);
-    logError(`Please update as soon as possible.`);
 }
 
 //Get txAdmin Resource Path
@@ -102,7 +92,6 @@ const txDataPathConvar = GetConvar('txDataPath', 'false');
 if(txDataPathConvar == 'false'){
     const dataPathSuffix = (osType == 'windows')? '..' : '../../../';
     dataPath = cleanPath(path.join(fxServerPath, dataPathSuffix, 'txData'));
-    log(`Version ${txAdminVersion} using data path '${dataPath}'`);
 }else{
     dataPath = cleanPath(txDataPathConvar);
 }
@@ -127,12 +116,100 @@ if(nonASCIIRegex.test(fxServerPath) || nonASCIIRegex.test(dataPath)){
     process.exit(1);
 }
 
-//Get Web Port
-const txAdminPortConvar = GetConvar('txAdminPort', '40120').trim();
-if(!/^\d+$/.test(txAdminPortConvar)){
-    logDie(`txAdminPort is not valid.`);
+
+//Get Debug/Dev convars
+const txAdminVerboseConvar = GetConvar('txAdminVerbose', 'false').trim();
+const verbose = (['true', '1', 'on'].includes(txAdminVerboseConvar));
+const txDebugPlayerlistGeneratorConvar = GetConvar('txDebugPlayerlistGenerator', 'false').trim();
+const debugPlayerlistGenerator = (['true', '1', 'on'].includes(txDebugPlayerlistGeneratorConvar));
+const txDebugExternalSourceConvar = GetConvar('txDebugExternalSource', 'false').trim();
+const debugExternalSource = (txDebugExternalSourceConvar !== 'false')? txDebugExternalSourceConvar : false;
+
+
+//Checking for Zap Configuration file
+const zapCfgFile = path.join(dataPath, 'txAdminZapConfig.json');
+let zapCfgData, isZapHosting, forceInterface, forceFXServerPort, txAdminPort, loginPageLogo, defaultMasterAccount, deployerDefaults;
+if(fs.existsSync(zapCfgFile)){
+    log('Loading Zap-Hosting configuration file.');
+    try {
+        zapCfgData = JSON.parse(fs.readFileSync(zapCfgFile));
+        isZapHosting = true;
+        forceInterface = zapCfgData.interface;
+        forceFXServerPort = zapCfgData.fxServerPort;
+        txAdminPort = zapCfgData.txAdminPort;
+        loginPageLogo = zapCfgData.loginPageLogo;
+        defaultMasterAccount = false;
+        deployerDefaults = {
+            license: zapCfgData.defaults.license,
+            maxClients: zapCfgData.defaults.maxClients,
+            mysqlHost: zapCfgData.defaults.mysqlHost,
+            mysqlUser: zapCfgData.defaults.mysqlUser,
+            mysqlPassword: zapCfgData.defaults.mysqlPassword,
+            mysqlDatabase: zapCfgData.defaults.mysqlDatabase,
+        }
+        if(zapCfgData.customer){
+            if(typeof zapCfgData.customer.name !== 'string') throw new Error("customer.name is not a string.");
+            if(zapCfgData.customer.name.length < 3) throw new Error("customer.name too short.");
+            if(typeof zapCfgData.customer.password_hash !== 'string') throw new Error("customer.password_hash is not a string.");
+            if(!zapCfgData.customer.password_hash.startsWith('$2y$')) throw new Error("customer.password_hash is not a bcrypt hash.");
+            defaultMasterAccount = {
+                name: zapCfgData.customer.name,
+                password_hash: zapCfgData.customer.password_hash,
+            }
+        }
+        const runtimeSecretConvar = GetConvar('txAdminRTS', 'false').trim();
+        if(runtimeSecretConvar !== 'false'){
+            if(!/^[0-9a-f]{48}$/i.test(runtimeSecretConvar)) logDie(`txAdminRTS is not valid.`);
+            runtimeSecret = runtimeSecretConvar;
+        }else{
+            runtimeSecret = false;
+        }
+
+        if(!isAdvancedUser) fs.unlinkSync(zapCfgFile);
+    } catch (error) {
+        logDie(`Failed to load with Zap-Hosting configuration error: ${error.message}`);
+    }
+}else{
+    isZapHosting = false;
+    forceFXServerPort = false;
+    loginPageLogo = false;
+    defaultMasterAccount = false;
+    runtimeSecret = false;
+    deployerDefaults = false;
+
+    const txAdminPortConvar = GetConvar('txAdminPort', '40120').trim();
+    if(!/^\d+$/.test(txAdminPortConvar)) logDie(`txAdminPort is not valid.`);
+    txAdminPort = parseInt(txAdminPortConvar);
+
+    const txAdminInterfaceConvar = GetConvar('txAdminInterface', 'false').trim();
+    if(txAdminInterfaceConvar == 'false'){
+        forceInterface = false;
+    }else{
+        if(!/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(txAdminInterfaceConvar)) logDie(`txAdminInterface is not valid.`);
+        forceInterface = txAdminInterfaceConvar;
+    }
 }
-const txAdminPort = parseInt(txAdminPortConvar);
+if(verbose) dir({isZapHosting, forceInterface, forceFXServerPort, txAdminPort, loginPageLogo, runtimeSecret, deployerDefaults});
+
+
+//Check if this version of txAdmin is too outdated to be considered safe to use in prod
+//NOTE: Only valid if its being very actively maintained.
+//          Use 30d for patch 0, or 45~60d otherwise
+const txVerBBLastUpdate = 1617619200;
+const txVerBBDelta = 21 + ((isZapHosting)? 10 : 0);
+const txAdminVersionBestBy = txVerBBLastUpdate + (txVerBBDelta * 86400); 
+// dir({
+//     updateDelta: txVerBBDelta,
+//     lastUpdate: new Date(txVerBBLastUpdate*1000).toLocaleString(),
+//     nextUpdate: new Date(txAdminVersionBestBy*1000).toLocaleString(),
+//     nextUpdateTS: txAdminVersionBestBy,
+//     timeLeft: require('humanize-duration')(((now() - txAdminVersionBestBy)*1000)),  
+// })
+if(now() > txAdminVersionBestBy){
+    logError(`This version of txAdmin is outdated.`);
+    logError(`Please update as soon as possible.`);
+}
+
 
 //Get profile name
 const serverProfile = GetConvar('serverProfile', 'default').replace(/[^a-z0-9._-]/gi, "").trim();
@@ -143,9 +220,7 @@ if(!serverProfile.length){
     logDie(`Invalid server profile name. Are you using Google Translator on the instructions page? Make sure there are no additional spaces in your command.`);
 }
 
-//Get verbosity
-const txAdminVerboseConvar = GetConvar('txAdminVerbose', 'false').trim();
-const verbose = (['true', '1', 'on'].includes(txAdminVerboseConvar));
+
 
 //Setting Global Data
 const noLookAlikesAlphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -157,12 +232,25 @@ GlobalData = {
     fxServerVersion,
     txAdminVersion,
     txAdminVersionBestBy,
-    //Convars
+
+    //Convars - default
     txAdminResourcePath,
     fxServerPath,
     dataPath,
-    txAdminPort,
+    //Convars - Debug
     verbose,
+    debugPlayerlistGenerator,
+    debugExternalSource,
+    //Convars - zap dependant
+    isZapHosting,
+    forceInterface,
+    forceFXServerPort,
+    txAdminPort,
+    loginPageLogo,
+    defaultMasterAccount,
+    runtimeSecret,
+    deployerDefaults, 
+
     //Consts
     validIdentifiers:{
         steam: /^steam:1100001[0-9A-Fa-f]{8}$/,
@@ -175,8 +263,10 @@ GlobalData = {
     regexActionID: new RegExp(`^[${noLookAlikesAlphabet}]{4}-[${noLookAlikesAlphabet}]{4}$`),
     regexWhitelistReqID: new RegExp(`R[${noLookAlikesAlphabet}]{4}`),
     noLookAlikesAlphabet,
+
     //Vars
     cfxUrl: null,
+    osDistro: null,
 }
 // NOTE: all variables set for monitor mode: monitorMode, version, serverRoot (cwd), citizen_root, citizen_dir
 

@@ -1,6 +1,5 @@
 //Requires
 const modulename = 'Authenticator';
-const chalk = require('chalk');
 const fs = require('fs-extra');
 const cloneDeep = require('lodash/cloneDeep');
 const { dir, log, logOk, logWarn, logError } = require('../../extras/console')(modulename);
@@ -9,10 +8,11 @@ const CitizenFXProvider = require('./providers/CitizenFX');
 
 module.exports = class Authenticator {
     constructor(config) {
-        logOk('Started');
+        // logOk('Started');
         this.config = config;
         this.adminsFile = `${GlobalData.dataPath}/admins.json`;
         this.admins = null;
+        this.refreshRoutine = null;
         this.registeredPermissions = {
             "all_permissions": "All Permissions",
             "manage.admins": "Manage Admins",
@@ -51,20 +51,30 @@ module.exports = class Authenticator {
 
         //Printing PIN or starting loop
         if (!adminFileExists) {
-            this.addMasterPin = (Math.random()*10000).toFixed().padStart(4, '0');
-            let sep = `=`.repeat(42);
-            log(sep);
-            log('==> Admins file not found.');
-            log(`==> PIN to add a master account: ` + chalk.inverse(' ' + this.addMasterPin + ' '));
-            log(sep);
-            this.admins = false;
+            if(!GlobalData.defaultMasterAccount){
+                this.addMasterPin = (Math.random()*10000).toFixed().padStart(4, '0');
+                this.admins = false;
+            }else{
+                log(`Setting up master account '${GlobalData.defaultMasterAccount.name}'. The password is the same as in zap-hosting.com.`);
+                this.createAdminsFile(GlobalData.defaultMasterAccount.name, false, false, GlobalData.defaultMasterAccount.password_hash, false);
+            }
+
         }else{
             this.refreshAdmins(true);
-            //Cron Function
-            setInterval(() => {
-                this.refreshAdmins();
-            }, this.config.refreshInterval);
+            this.setupRefreshRoutine();
         }
+    }
+
+
+    //================================================================
+    /**
+     * sets the admins file refresh routine
+     */
+    setupRefreshRoutine(){
+        logError('setup routine')
+        this.refreshRoutine = setInterval(() => {
+            this.refreshAdmins();
+        }, this.config.refreshInterval);
     }
 
 
@@ -75,31 +85,37 @@ module.exports = class Authenticator {
      * @param {string} identifier
      * @param {object} provider_data
      * @param {string} password backup password
+     * @param {boolean} isPlainText
      * @returns {(boolean)} true or throws an error
      */
-    async createAdminsFile(username, identifier, provider_data, password){
-        //Check if admins file already exist
-        if(this.admins != false) throw new Error("Admins file already exists.");
+    createAdminsFile(username, identifier, provider_data, password, isPlainText){
+        //Sanity check
+        if(this.admins !== false && this.admins !== null) throw new Error("Admins file already exists.");
+        if(typeof username !== 'string' || username.length < 3) throw new Error("Invalid username parameter.");
+        if(typeof password !== 'string' || password.length < 6) throw new Error("Invalid password parameter.");
 
         //Creating admin array
+        let providers = {};
+        if(identifier && provider_data){
+            providers.citizenfx = {
+                id: username,
+                identifier,
+                data: provider_data
+            }
+        }
         this.admins = [{
             name: username,
             master: true,
-            password_hash: GetPasswordHash(password),
-            providers: {
-                citizenfx: {
-                    id: username,
-                    identifier,
-                    data: provider_data
-                }
-            },
+            password_hash: (isPlainText)? GetPasswordHash(password) : password,
+            providers,
             permissions: []
         }];
 
         //Saving admin file
         try {
-            let json = JSON.stringify(this.admins, null, 2);
-            await fs.writeFile(this.adminsFile, json, {encoding: 'utf8', flag: 'wx'});
+            const json = JSON.stringify(this.admins, null, 2);
+            fs.writeFileSync(this.adminsFile, json, {encoding: 'utf8', flag: 'wx'});
+            this.setupRefreshRoutine();
             return true;
         } catch (error) {
             let message = `Failed to create '${this.adminsFile}' with error: ${error.message}`;
@@ -151,8 +167,9 @@ module.exports = class Authenticator {
      */
     getAdminByName(uname){
         if(this.admins == false) return false;
-        let username = uname.trim().toLowerCase();
-        let admin = this.admins.find((user) => {
+        const username = uname.trim().toLowerCase();
+        if(!username.length) return false;
+        const admin = this.admins.find((user) => {
             return (username === user.name.toLowerCase())
         });
         return (admin)? cloneDeep(admin) : false;
@@ -383,7 +400,7 @@ module.exports = class Authenticator {
         }
 
         let structureIntegrityTest = jsonData.some((x) => {
-            if(typeof x.name !== 'string' || x.name < 3) return true;
+            if(typeof x.name !== 'string' || x.name.length < 3) return true;
             if(typeof x.master !== 'boolean') return true;
             if(typeof x.password_hash !== 'string' || !x.password_hash.startsWith('$2')) return true;
             if(typeof x.providers !== 'object') return true;
@@ -410,7 +427,6 @@ module.exports = class Authenticator {
         }
 
         this.admins = jsonData;
-        // if(GlobalData.verbose) log(`Admins file loaded. Found: ${this.admins.length}`);
         return true;
     }
 
